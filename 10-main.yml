@@ -1,0 +1,185 @@
+---
+- name: "Wordpress Installation"
+  hosts: amazon
+  become: true
+  vars_files:
+    - apache.vars
+    - domain.vars
+    - mariadb.vars
+    - wordpress.vars
+  tasks:
+
+################################## Apache ##############################################################
+
+    - name: "Apache Installing PHP"
+      shell: amazon-linux-extras install php7.4 -y
+      tags:
+        - lamp
+
+    - name: "Apache - Installing httpd"
+      yum:
+        name: httpd
+        state: present
+      tags:
+        - lamp
+
+    - name: "Apache - copying httpd.conf"
+      template:
+        src: httpd.conf.tmpl
+        dest: /etc/httpd/conf/httpd.conf
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+      tags:
+        - lamp
+
+    - name: "Apache - copying vhost.conf.tmpl"
+      template:
+        src: vhost.conf.tmpl
+        dest:  "/etc/httpd/conf.d/{{ httpd_domain }}.conf"
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+      tags:
+        - lamp
+
+
+    - name: "Apache - Creating DocumentRoot"
+      file:
+        path: "/var/www/html/{{ httpd_domain }}"
+        state: directory
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}" 
+      tags:
+        - lamp
+
+    - name: "Apache - Restarting/Enabling httpd Service"
+      service:
+        name: httpd
+        state: restarted
+        enabled: true
+      tags:
+        - lamp
+
+####################### Mariadb ##################################################
+
+    - name: "Mariadb - Installation"
+      yum:
+        name: 
+          - mariadb-server
+          - MySQL-python
+        state: present
+
+    - name: "Mariadb - Restart"
+      service:
+        name: mariadb
+        state: restarted
+        enabled: true
+      tags:
+        - lamp
+        - mariadb
+
+    - name: "Mariadb-Reset Root Password"
+      ignore_errors: true
+      mysql_user:
+        login_user: "root"
+        login_password: ""
+        user: "root"
+        password: "{{ sql_root_password }}"
+        host_all: true
+      tags:
+        - lamp
+        - mariadb 
+
+    - name: "Mariadb-Removing Anonymous Users"
+      mysql_user:
+        login_user: "root"
+        login_password: "{{ sql_root_password }}"
+        user: ""
+        state: absent
+      tags:
+        - lamp
+        - mariadb  
+
+    - name: "Mariad-Removing test database"
+      mysql_db:
+        login_user: "root"
+        login_password: "{{ sql_root_password }}"
+        name: "test"
+        state: absent
+      tags:
+        - lamp
+        - mariadb
+
+    - name: "Mariad-Creating extra database for wordpress"
+      mysql_db:
+        login_user: "root"
+        login_password: "{{ sql_root_password }}"
+        name: "{{ sql_extra_database }}"
+        state: present
+      tags:
+        - lamp
+        -  mariadb
+
+
+    - name: "Mariad-Server - Creating Extra user for wordpress"
+      mysql_user:
+        login_user: "root"
+        login_password: "{{ sql_root_password }}"
+        user: "{{ sql_extra_user }}"
+        password: "{{ sql_extra_user_password }}"
+        state: present
+        priv: '{{ sql_extra_database }}.*:ALL'
+      tags:
+        - lamp
+        - mariadb
+
+######################### Wordpress ########################################################
+
+
+    - name: "Downloading wordpress"
+      get_url:
+        url: "{{ wordpress_url }}"
+        dest:  "/tmp/wordpress.tar.gz"  
+
+    - name: "Wordpress - Extracting Archive File"
+      unarchive:
+        src: "/tmp/wordpress.tar.gz"
+        dest: "/tmp/"
+        remote_src: true
+
+
+    - name: "Wordpress - Copying Contents From /tmp/wordpress/ to /var/www/html/{{ httpd_domain }}/"
+      copy:
+        src: "/tmp/wordpress/"
+        dest: "/var/www/html/{{ httpd_domain }}/"
+        remote_src: true
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"      
+
+
+    - name: "Wordpress - Creating wp-config.php"
+      template:
+        src: wp-config.php.tmpl
+        dest: "/var/www/html/{{ httpd_domain }}/wp-config.php"
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+
+
+###################### Post Installation ################################################################
+
+    - name: "Post-Installation - Clean Up"
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "/tmp/wordpress"
+        - "/tmp/wordpress.tar.gz"
+
+
+    - name: "Post-Installation - Restart services"
+      service:
+        name: "{{ item }}"
+        state: restarted
+        enabled: true
+      with_items:
+        - httpd
+        - mariadb      
