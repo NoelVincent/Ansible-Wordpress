@@ -5,8 +5,24 @@
   vars_files:
     - apache.vars
     - domain.vars
-    - mariadb.vars
     - wordpress.vars
+    
+  vars_prompt:
+
+    - name: sql_root_password
+      prompt: Enter the root password for MySQL
+      private: yes
+
+    - name: sql_extra_user
+      prompt: Enter the Database User Name for your Wordpress
+
+    - name: sql_extra_user_password
+      prompt: Enter the Password for the Database user for your Wordpress
+      private: yes
+
+    - name: sql_extra_database
+      prompt: Enter the database name for your Wordpress  
+    
   tasks:
 
 ################################## Apache ##############################################################
