@@ -6,6 +6,7 @@
     - apache.vars
     - domain.vars
     - wordpress.vars
+    - mariadb.vars
     
   vars_prompt:
 
