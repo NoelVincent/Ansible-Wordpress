@@ -130,6 +130,9 @@ define( 'DB_PASSWORD', '{{ sql_extra_user_password }}' );
 
 # 6. Creating Playbook
 ```sh
+vim main.yml
+```
+```sh
 ---
 - name: "Wordpress Installation"
   hosts: amazon
@@ -156,23 +159,22 @@ define( 'DB_PASSWORD', '{{ sql_extra_user_password }}' );
     
   tasks:
 ```
-- ## Task  - Apache
+## Tasks  - Apache
 ```sh
 ################################## Apache ##############################################
-
-    - name: "Apache Installing PHP"
+    - name: "Installing PHP"
       shell: amazon-linux-extras install php7.4 -y
       tags:
         - lamp
 
-    - name: "Apache - Installing httpd"
+    - name: "Installing httpd"
       yum:
         name: httpd
         state: present
       tags:
         - lamp
 
-    - name: "Apache - copying httpd.conf"
+    - name: "copying httpd.conf"
       template:
         src: httpd.conf.tmpl
         dest: /etc/httpd/conf/httpd.conf
@@ -181,7 +183,7 @@ define( 'DB_PASSWORD', '{{ sql_extra_user_password }}' );
       tags:
         - lamp
 
-    - name: "Apache - copying vhost.conf.tmpl"
+    - name: "copying vhost.conf.tmpl"
       template:
         src: vhost.conf.tmpl
         dest:  "/etc/httpd/conf.d/{{ httpd_domain }}.conf"
@@ -190,8 +192,7 @@ define( 'DB_PASSWORD', '{{ sql_extra_user_password }}' );
       tags:
         - lamp
 
-
-    - name: "Apache - Creating DocumentRoot"
+    - name: "Creating DocumentRoot"
       file:
         path: "/var/www/html/{{ httpd_domain }}"
         state: directory
@@ -200,12 +201,144 @@ define( 'DB_PASSWORD', '{{ sql_extra_user_password }}' );
       tags:
         - lamp
 
-    - name: "Apache - Restarting/Enabling httpd Service"
+    - name: "Restarting httpd Service"
       service:
         name: httpd
         state: restarted
         enabled: true
       tags:
         - lamp
+```
+## Tasks  - Mariadb
+```sh
+####################### Mariadb ##################################################
+    - name: "Mariadb Installation"
+      yum:
+        name: 
+          - mariadb-server
+          - MySQL-python
+        state: present
 
+    - name: "Mariadb - Restart"
+      service:
+        name: mariadb
+        state: restarted
+        enabled: true
+      tags:
+        - lamp
+        - mariadb
+
+    - name: "Mariadb-Reset Root Password"
+      ignore_errors: true
+      mysql_user:
+        login_user: "root"
+        login_password: ""
+        user: "root"
+        password: "{{ sql_root_password }}"
+        host_all: true
+      tags:
+        - lamp
+        - mariadb 
+        
+    - name: "Removing Anonymous Users"
+      mysql_user:
+        login_user: "root"
+        login_password: "{{ sql_root_password }}"
+        user: ""
+        state: absent
+      tags:
+        - lamp
+        - mariadb  
+
+    - name: "Removing test database"
+      mysql_db:
+        login_user: "root"
+        login_password: "{{ sql_root_password }}"
+        name: "test"
+        state: absent
+      tags:
+        - lamp
+        - mariadb
+
+    - name: "Creating extra database for wordpress"
+      mysql_db:
+        login_user: "root"
+        login_password: "{{ sql_root_password }}"
+        name: "{{ sql_extra_database }}"
+        state: present
+      tags:
+        - lamp
+        -  mariadb
+        
+    - name: "Creating Extra user for wordpress"
+      mysql_user:
+        login_user: "root"
+        login_password: "{{ sql_root_password }}"
+        user: "{{ sql_extra_user }}"
+        password: "{{ sql_extra_user_password }}"
+        state: present
+        priv: '{{ sql_extra_database }}.*:ALL'
+      tags:
+        - lamp
+        - mariadb
+```
+## Tasks -  Wordpress
+```sh
+######################### Wordpress ######################################################
+    - name: "Downloading wordpress"
+      get_url:
+        url: "{{ wordpress_url }}"
+        dest:  "/tmp/wordpress.tar.gz"  
+
+    - name: "Extracting Archive File"
+      unarchive:
+        src: "/tmp/wordpress.tar.gz"
+        dest: "/tmp/"
+        remote_src: true
+
+    - name: "Copying Contents"
+      copy:
+        src: "/tmp/wordpress/"
+        dest: "/var/www/html/{{ httpd_domain }}/"
+        remote_src: true
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"      
+
+    - name: "Creating wp-config.php"
+      template:
+        src: wp-config.php.tmpl
+        dest: "/var/www/html/{{ httpd_domain }}/wp-config.php"
+        owner: "{{ httpd_user }}"
+        group: "{{ httpd_group }}"
+```
+## Tasks -  Post Installation
+```sh
+###################### Post Installation ################################################
+    - name: "Post-Installation - Clean Up"
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "/tmp/wordpress"
+        - "/tmp/wordpress.tar.gz"
+
+    - name: "Post-Installation - Restart services"
+      service:
+        name: "{{ item }}"
+        state: restarted
+        enabled: true
+      with_items:
+        - httpd
+        - mariadb      
+```
+## Execution
+> Make sure the Playbook, inventory file and the SSH key to access client server in working directory of the Ansible Master server.
+
+- Running a syntax check
+```sh
+ansible-playbook -i hosts main.yml --syntax-check
+```
+- Executing the Playbook
+```sh
+ansible-playbook -i hosts main.yml
 ```
