@@ -141,6 +141,7 @@ vim main.yml
     - apache.vars
     - domain.vars
     - wordpress.vars
+    - mariadb.vars
     
   vars_prompt:
     - name: sql_root_password
