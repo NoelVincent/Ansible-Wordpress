@@ -56,19 +56,6 @@ vim domain.vars
 ---
 httpd_domain: "www.example.com"
 ```
- 
-- Defining some variables for Mariadb
-```sh
-vim mariadb.vars
-```
-```
----
-sql_root_password: "root@12345"
-sql_extra_user: "wordpress"
-sql_extra_user_password: "wordpress@123"
-sql_extra_database: "wordpress"
-```
-
 - Defining some variables for wordpress
 ```sh
 vim wordpress.vars
