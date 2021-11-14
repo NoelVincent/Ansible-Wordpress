@@ -32,7 +32,7 @@ IP   ansible_user="ec2-user" ansible_port="22" ansible_private_key_file="ansible
 ```
 
 # 2. Creating variable files
-- Here, I am defining some variables that will be used ro run in the ansible-playbook.
+- Here, I am defining some variables that will be used to run in the ansible-playbook.
 - Extension of the files will be .vars
 
 You can learn more about the same in the [website.](https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html)
